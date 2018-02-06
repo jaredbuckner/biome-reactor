@@ -10,67 +10,53 @@ using react::product;
 int main(int argc, char* argv[]) {
   react::Simulator mySim;
 
-  constexpr double rateConstant = std::exp(1.0);
-
-  double plants = 5000;
+  double plants = 10000;
   mySim.set_params(&plants, 0.1, 0.01);
   
-  // Growing plants
-  constexpr double plantLimit = 10000;
-  constexpr double plantRate = 1.0 / 15.0;
-  reaction(mySim, plantRate / rateConstant, &plants)
-    >> product(&plants, 2);
-  reaction(mySim, - plantRate / plantLimit / rateConstant, &plants, &plants)
-    >> product(&plants, 3);
+  // Plants reproduce
+  reaction(mySim, 0.1, &plants) >> product(&plants, 2);
 
-  // Starving mice
+  // Plants crowd each other out
+  reaction(mySim, 0.1 / 50000, &plants, &plants) >> product(&plants);
+
   double hMice = 0;
   mySim.set_params(&hMice, 0.1, 0.01);
-  constexpr double miceDRate = 1.0 / 10.0;
-  reaction(mySim, miceDRate / rateConstant, &hMice); // No products!
-  
-  // Well fed mice
-  double fMice = 100;
-  mySim.set_params(&fMice, 0.1, 0.01);
-  constexpr double mouseSeekRate = 24.0;
-  constexpr double mousePlantsPerDay = 2.0;
-  reaction(mySim, mouseSeekRate / rateConstant, &hMice, &plants)
-    >> product(&fMice, 1.0 / mousePlantsPerDay)
-    >> product(&hMice, 1.0 - 1.0 / mousePlantsPerDay);
 
-  reaction(mySim, 1.0 / mousePlantsPerDay / rateConstant, &fMice)
+  // Hungry mice die;
+  reaction(mySim, 0.1, &hMice);
+  
+  double fMice = 400;
+  mySim.set_params(&fMice, 0.1, 0.01);
+
+  // Well fed mice reproduce
+  reaction(mySim, 0.05, &fMice) >> product(&fMice, 2);
+
+  // Hungry mice eat
+  reaction(mySim, 0.0001, &hMice, &plants)
+    >> product(&fMice);
+
+  // Full mice get hungry
+  reaction(mySim, 1.0, &fMice)
     >> product(&hMice);
 
-  constexpr double mouseBRate = 1.0 / 30.0;
-  reaction(mySim, mouseBRate / rateConstant, &fMice)
-    >> product(&fMice, 2.0);  
-  
-  // Starving hawks
-  double hHawks = 1;
+  double hHawks = 0;
   mySim.set_params(&hHawks, 0.1, 0.01);
-  constexpr double hawkDRate = 1.0 / 14.0;
-  reaction(mySim, hawkDRate / rateConstant, &hHawks); // No products!
   
-  // Well fed hawks
-  double fHawks = 0;
-  mySim.set_params(&fHawks, 0.1, 0.01);
-  constexpr double hawkSeekRate = 10.0;
-  constexpr double hawkMicePerDay = 3.0;
-  reaction(mySim, hawkSeekRate / rateConstant, &hMice, &hHawks)
-    >> product(&fHawks, 1.0 / hawkMicePerDay)
-    >> product(&hHawks, 1.0 - 1.0 / hawkMicePerDay);
-  
-  reaction(mySim, hawkSeekRate / rateConstant, &fMice, &hHawks)
-    >> product(&fHawks, 1.0 / hawkMicePerDay)
-    >> product(&hHawks, 1.0 - 1.0 / hawkMicePerDay);
-  
-  reaction(mySim, 1.0 / hawkMicePerDay, &fHawks)
-    >> product(&hHawks);
-  
-  constexpr double hawkBRate = 1.0 / 90.0;
-  reaction(mySim, hawkBRate / rateConstant, &fHawks)
-    >> product(&fHawks, 2.0);
-  
+  // Hungry hawks die
+  reaction(mySim, 0.05, &hHawks);
+
+  double fHawks = 5;
+  mySim.set_params(&fHawks, 0.01, 0.01);
+
+  // Well fed hawks reproduce
+  reaction(mySim, 0.02, &fHawks) >> product(&fHawks, 2);
+
+  // Hungry hawks eat
+  reaction(mySim, 0.002, &hHawks, &hMice) >> product(&fHawks);
+  reaction(mySim, 0.002, &hHawks, &fMice) >> product(&fHawks);
+
+  // Full hawks get hungry
+  reaction(mySim, 1.0, &fHawks) >> product(&hHawks);  
   
   double t = 0.0;
   double stepSize = 1.0;
@@ -78,7 +64,7 @@ int main(int argc, char* argv[]) {
   for(size_t hours = 0; hours <= 24 * 365 * 5.0; ++hours) {
     double nextT = (double)hours / 24.0;
     
-    printf("%6.2f : %.0f  %.0f (%2.0f%%)  %.0f (%2.0f%%)\n", t,
+    printf("%6.2f : %7.0f  %5.0f (%3.0f%%)  %3.0f (%3.0f%%)\n", t,
            plants,
            (hMice + fMice), 100.0 * fMice / (hMice + fMice),
            (hHawks + fHawks), 100.0 * fHawks / (hHawks + fHawks));
